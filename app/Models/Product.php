@@ -5,9 +5,9 @@ namespace App\Models;
 use Illuminate\Support\Str;
 use Illuminate\Database\Eloquent\Model;
 
-class Category extends Model
+class Product extends Model
 {
-    protected $fillable = ['name', 'parent_id'];
+    protected $fillable = ['name', 'description', 'price'];
 
     protected static function boot()
     {
@@ -20,7 +20,7 @@ class Category extends Model
     }
 
     // Generate a unique slug based on product name
-    protected static function generateUniqueSlug(string $name)
+    protected function generateUniqueSlug(string $name)
     {
         $slug = Str::slug($name);
         $count = static::where('slug', 'LIKE', "{$slug}%")->count();
@@ -29,19 +29,8 @@ class Category extends Model
     }
 
 
-    public function parent()
+    public function categories()
     {
-        return $this->belongsTo(Category::class, 'parent_id');
-    }
-
-    public function children()
-    {
-        return $this->hasMany(Category::class, 'parent_id')->with('children');
-    }
-
-    public function products()
-    {
-        return $this->belongsToMany(Product::class, 'category_product')
-            ->withTimestamps();
+        return $this->belongsToMany(Category::class, 'category_product')->withTimestamps();
     }
 }
