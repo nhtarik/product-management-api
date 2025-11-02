@@ -44,7 +44,7 @@ class CategoryController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(StoreCategoryRequest $request)
+    public function store(StoreCategoryRequest $request): JsonResponse
     {
         $validated = $request->validated();
 
@@ -57,49 +57,41 @@ class CategoryController extends Controller
 
                 $created = collect();
 
-                // Case:01 - Create parent category + subCategories categories if provided
-                if (!empty($parentCatName) && !empty($subCategories)) {
+                // Helper closure to create a category
+                $createCategory = fn(string $name, ?int $parent = null) => Category::create([
+                    'name'      => $name,
+                    'parent_id' => $parent,
+                ]);
 
-                    $parentCategory = Category::create([
-                        'name'      => $parentCatName,
-                        'parent_id' => $parentId
-                    ]);
-
+                // Case 1 & 2: Create parent category if name is provided
+                $parentCategory = null;
+                if (!empty($parentCatName)) {
+                    $parentCategory = $createCategory($parentCatName, $parentId);
                     $created->push($parentCategory);
-
-                    foreach ($subCategories as $key => $subcategory) {
-                        $childCategories = Category::create([
-                            'name' => $subcategory['name'] ?? $subcategory,
-                            'parent_id' => $parentCategory->id,
-                        ]);
-
-                        $created->push($childCategories);
-                    }
-
-                    return $created;
                 }
 
-
-                // Case:02 -  Create subcategories under existing parent
-                if ($parentId && !empty($subCategories)) {
-                    foreach ($subCategories as $key => $subcategory) {
-
-                        $childCategories = Category::create([
-                            'name' => $subcategory['name'] ?? $subcategory,
-                            'parent_id' => $parentId,
-                        ]);
-
-                        $created->push($childCategories);
+                // Case 1 & 3: Create subcategories if provided
+                if (!empty($subCategories)) {
+                    $parentForSub = $parentCategory->id ?? $parentId;
+                    if (!$parentForSub) {
+                        throw new Exception('Cannot create subcategories without a parent ID.');
                     }
 
-                    return $created;
+                    foreach ($subCategories as $subcategory) {
+                        $childCategory = $createCategory($subcategory['name'] ?? $subcategory, $parentForSub);
+                        $created->push($childCategory);
+                    }
                 }
 
-                // Case:03 - Invalid input → rollback automatically
-                throw new Exception('Invalid input. Provide either a category name or subcategories.');
+                // If nothing created → invalid input
+                if ($created->isEmpty()) {
+                    throw new Exception('Invalid input. Provide a category name or subcategories.');
+                }
+
+                return $created;
             });
 
-            // Load children for each category safely
+            // Load children for each created category
             $createdCategories->each->load('children');
 
             return response()->json([
@@ -121,10 +113,12 @@ class CategoryController extends Controller
         }
     }
 
+
+
     /**
      * Display the specified resource.
      */
-    public function show(Category $category)
+    public function show(Category $category): JsonResponse
     {
         $category->load(['parent', 'children']);
 
@@ -144,83 +138,60 @@ class CategoryController extends Controller
         try {
             $updatedCategories = DB::transaction(function () use ($validated, $category) {
 
-                // Initialize collection to track updated categories
                 $updated = collect([$category]);
 
-                if (array_key_exists('parent_id', $validated)) {
+                // $newParentId = $validated['parent_id'] ?? $category->parent_id;
+                $newParentId = array_key_exists('parent_id', $validated)
+                    ? $validated['parent_id']
+                    : $category->parent_id;
 
-                    $parentId = $validated['parent_id'];
+                $newName     = $validated['name'] ?? $category->name;
+                $subCategories = $validated['subcategories'] ?? [];
 
-                    /*
-                    |-------------------------------------------------------------------
-                    | Validate parent assignment
-                    |-------------------------------------------------------------------
-                    | Prevent the category from being its own parent or creating a cyclic tree.
-                    */
-                    if ($parentId === $category->id) {
+                // dd('newParentId', $newParentId, $validated);
 
-                        // Throw exception instead
-                        throw new \InvalidArgumentException(
-                            'A category cannot be its own parent; here: ' . json_encode([
-                                'input_parent_id' => $parentId,
-                                'category_id'     => $category->id,
-                            ])
-                        );
-                    }
+                // Prevent cyclic or invalid parent assignment
+                if ($newParentId === $category->id) {
+                    throw new \InvalidArgumentException('A category cannot be its own parent.');
+                }
 
-                    if ($parentId && $this->isDescendantOf($category->id, $parentId)) {
-                        throw new \InvalidArgumentException(
-                            'Cannot assign a descendant category as parent; here: ' . json_encode([
-                                'input_parent_id' => $parentId,
-                                'category_id'     => $category->id,
-                            ])
-                        );
-                    }
+                if ($newParentId && $this->isDescendantOf($category->id, $newParentId)) {
+                    throw new \InvalidArgumentException('Cannot assign a descendant category as parent.');
+                }
 
-                    // -------------------------------
-                    // Update main category
-                    // -------------------------------
-                    if (array_key_exists('name', $validated)) {
-                        $category->name = $validated['name'];
-                    }
+                // Update main category
+                $category->update([
+                    'name'      => $newName,
+                    'parent_id' => $newParentId,
+                ]);
 
-                    $category->parent_id = $parentId;
-                    $category->save();
+                // Handle subcategories
+                foreach ($subCategories as $sub) {
+                    $subData = is_string($sub) ? ['name' => $sub] : $sub;
 
-                    // -------------------------------
-                    // Handle subcategories (create/update/sync)
-                    // -------------------------------
-                    if (!empty($validated['subcategories'])) {
-                        foreach ($validated['subcategories'] as $sub) {
-                            $subData = is_string($sub) ? ['name' => $sub] : $sub;
+                    if (!empty($subData['id'])) {
+                        // Update existing subcategory
+                        $existingSub = Category::where('parent_id', $category->id)
+                            ->where('id', $subData['id'])
+                            ->first();
 
-                            if (!empty($subData['id'])) {
-                                $existingSub = Category::where('parent_id', $parentId)
-                                    ->where('id', $subData['id'])
-                                    ->first();
-
-                                if ($existingSub) {
-                                    // Update existing subcategories
-                                    $existingSub->update([
-                                        'name' => $subData['name'] ?? $existingSub->name
-                                    ]);
-
-                                    $updated->push($existingSub);
-                                }
-                            } else {
-                                // Create new subcategory under this category
-                                $newSub = Category::create([
-                                    'name'      => $subData['name'],
-                                    'parent_id' => $category->id
-                                ]);
-
-                                $updated->push($newSub);
-                            }
+                        if ($existingSub) {
+                            $existingSub->update([
+                                'name' => $subData['name'] ?? $existingSub->name
+                            ]);
+                            $updated->push($existingSub);
                         }
+                    } else {
+                        // Create new subcategory
+                        $newSub = Category::create([
+                            'name'      => $subData['name'],
+                            'parent_id' => $category->id,
+                        ]);
+                        $updated->push($newSub);
                     }
                 }
 
-                // Load relationship for response
+                // Load relationships for response
                 $updated->each->load(['parent', 'children']);
 
                 return $updated;
@@ -232,7 +203,6 @@ class CategoryController extends Controller
                 'categories' => CategoryResource::collection($updatedCategories),
             ]);
         } catch (\Exception $e) {
-            // For unexpected server/database errors
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update category.',
@@ -247,23 +217,20 @@ class CategoryController extends Controller
 
     /**
      * Check if $targetId is a descendant of $categoryId.
-     * Used to prevent cyclic parent assignments.
      */
     private function isDescendantOf(int $categoryId, int $targetId): bool
     {
         $target = Category::find($targetId);
         if (!$target) return false;
 
-        // Climb up the tree to see if the target's ancestor = categoryId
         while ($target->parent_id) {
-            if ($target->parent_id === $categoryId) {
-                return true;
-            }
+            if ($target->parent_id === $categoryId) return true;
             $target = $target->parent;
         }
 
         return false;
     }
+
 
 
     /**
@@ -276,7 +243,7 @@ class CategoryController extends Controller
             $category->load('children');
 
             // Wrap in resource before deletion if you want the API to return it
-            $deletedCategory = new \App\Http\Resources\CategoryResource($category);
+            $deletedCategory = new CategoryResource($category);
 
             // Delete the category (DB cascades automatically)
             $category->delete();
