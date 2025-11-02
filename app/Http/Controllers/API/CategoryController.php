@@ -113,8 +113,6 @@ class CategoryController extends Controller
         }
     }
 
-
-
     /**
      * Display the specified resource.
      */
@@ -131,7 +129,7 @@ class CategoryController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(UpdateCategoryRequest $request, Category $category)
+    public function update(UpdateCategoryRequest $request, Category $category): JsonResponse
     {
         $validated = $request->validated();
 
@@ -148,7 +146,6 @@ class CategoryController extends Controller
                 $newName     = $validated['name'] ?? $category->name;
                 $subCategories = $validated['subcategories'] ?? [];
 
-                // dd('newParentId', $newParentId, $validated);
 
                 // Prevent cyclic or invalid parent assignment
                 if ($newParentId === $category->id) {
@@ -231,12 +228,10 @@ class CategoryController extends Controller
         return false;
     }
 
-
-
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Category $category)
+    public function destroy(Category $category): JsonResponse
     {
         try {
             // Optionally load children if want to return deleted hierarchy
