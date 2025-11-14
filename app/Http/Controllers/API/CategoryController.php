@@ -10,10 +10,13 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\CategoryResource;
 use App\Http\Requests\StoreCategoryRequest;
 use App\Http\Requests\UpdateCategoryRequest;
+use App\ImageUploadTrait;
 use Illuminate\Http\JsonResponse;
 
 class CategoryController extends Controller
 {
+    use ImageUploadTrait;
+    
     /**
      * Display a listing of the resource.
      */
@@ -155,6 +158,9 @@ class CategoryController extends Controller
                 if ($newParentId && $this->isDescendantOf($category->id, $newParentId)) {
                     throw new \InvalidArgumentException('Cannot assign a descendant category as parent.');
                 }
+
+                // Handle image upload
+                $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'products', $product->image);
 
                 // Update main category
                 $category->update([

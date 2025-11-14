@@ -22,7 +22,7 @@ class UpdateCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        $id = $this->route('category')->id ?? null;
+        $categoryId = $this->route('category')->id ?? null;
 
         return [
             'name' => [
@@ -30,11 +30,13 @@ class UpdateCategoryRequest extends FormRequest
                 'required',
                 'string',
                 'max:255',
-                Rule::unique('categories', 'name')->ignore($id),
+                Rule::unique('categories', 'name')->ignore($categoryId),
             ],
-            'subcategories' => 'nullable|array',
-            'subcategories.*' => 'string|required_with:subcategories|max:255',
-            'parent_id' => 'nullable|numeric|exists:categories,id',
+            'subcategories'     => 'nullable|array',
+            'subcategories.*'   => 'string|required_with:subcategories|max:255',
+            'parent_id'         => 'nullable|numeric|exists:categories,id',
+            'image'             => 'nullable|image|mimes:jpg,jpeg,png|max:3072',
+            'subcat_image'      => 'nullable|image|mimes:jpg,jpeg,png|max:3072'
         ];
     }
 }

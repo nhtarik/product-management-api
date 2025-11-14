@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
-    protected $fillable = ['name', 'description', 'price'];
+    protected $fillable = ['name', 'description', 'price', 'stock', 'sku', 'is_active', 'image'];
 
     protected static function boot()
     {
@@ -20,14 +20,13 @@ class Product extends Model
     }
 
     // Generate a unique slug based on product name
-    protected function generateUniqueSlug(string $name)
+    protected static function generateUniqueSlug(string $name)
     {
         $slug = Str::slug($name);
         $count = static::where('slug', 'LIKE', "{$slug}%")->count();
 
         return $count ? "{$slug}-$count" : $slug;
     }
-
 
     public function categories()
     {

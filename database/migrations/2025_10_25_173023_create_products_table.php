@@ -24,6 +24,7 @@ return new class extends Migration
             $table->timestamps();
 
             // Additional indexes
+            $table->index('name');
             $table->index('price');
             $table->index('stock');
             $table->index('is_active');
