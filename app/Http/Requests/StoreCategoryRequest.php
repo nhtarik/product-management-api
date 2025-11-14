@@ -21,14 +21,15 @@ class StoreCategoryRequest extends FormRequest
      */
     public function rules(): array
     {
-        // dd('request', $this->all());
         return [
-            'name' => 'required_without:subcategories|string|max:255|unique:categories,name',
-            'parent_id' => 'nullable|numeric|exists:categories,id',
+            'name'          => 'required_without:subcategories|string|max:255|unique:categories,name',
+            'parent_id'     => 'nullable|numeric|exists:categories,id',
+            'image'         => 'nullable|image|mimes:jpg,jpeg,png|max:3072',
+            'subcat_image'  => 'nullable|image|mimes:jpg,jpeg,png|max:3072',
 
             // Subcategories can be an array of strings
-            'subcategories' => 'nullable|array',
-            'subcategories.*' => 'required_with:subcategories|max:255|unique:categories,name',
+            'subcategories'     => 'nullable|array',
+            'subcategories.*'   => 'required_with:subcategories|max:255|unique:categories,name',
         ];
     }
 }

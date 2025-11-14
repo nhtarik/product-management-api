@@ -14,12 +14,12 @@ class Category extends Model
         parent::boot();
 
         // Automatically generating slug when creating
-        static::creating(function ($product) {
-            $product->slug = static::generateUniqueSlug($product->name);
+        static::creating(function ($category) {
+            $category->slug = static::generateUniqueSlug($category->name);
         });
     }
 
-    // Generate a unique slug based on product name
+    // Generate a unique slug based on category name
     protected static function generateUniqueSlug(string $name)
     {
         $slug = Str::slug($name);
