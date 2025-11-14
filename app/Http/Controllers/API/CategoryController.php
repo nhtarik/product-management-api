@@ -16,7 +16,7 @@ use Illuminate\Http\JsonResponse;
 class CategoryController extends Controller
 {
     use ImageUploadTrait;
-    
+
     /**
      * Display a listing of the resource.
      */
@@ -69,6 +69,10 @@ class CategoryController extends Controller
                 // Case 1 & 2: Create parent category if name is provided
                 $parentCategory = null;
                 if (!empty($parentCatName)) {
+
+                    // Handle image upload
+                    $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'assets/images/categories');
+
                     $parentCategory = $createCategory($parentCatName, $parentId);
                     $created->push($parentCategory);
                 }
@@ -141,13 +145,12 @@ class CategoryController extends Controller
 
                 $updated = collect([$category]);
 
-                // $newParentId = $validated['parent_id'] ?? $category->parent_id;
                 $newParentId = array_key_exists('parent_id', $validated)
                     ? $validated['parent_id']
                     : $category->parent_id;
 
-                $newName     = $validated['name'] ?? $category->name;
-                $subCategories = $validated['subcategories'] ?? [];
+                $newName        = $validated['name'] ?? $category->name;
+                $subCategories  = $validated['subcategories'] ?? [];
 
 
                 // Prevent cyclic or invalid parent assignment
@@ -160,7 +163,7 @@ class CategoryController extends Controller
                 }
 
                 // Handle image upload
-                $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'products', $product->image);
+                $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'assets/images/categories', $category->image);
 
                 // Update main category
                 $category->update([

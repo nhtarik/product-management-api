@@ -111,7 +111,7 @@ class ProductController extends Controller
             $product = DB::transaction(function () use ($validated) {
 
                 // Handle image upload
-                $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'products');
+                $validated['image'] = $this->uploadFile($validated['image'] ?? null, 'assets/images/products');
 
                 $product = Product::create($validated);
 
