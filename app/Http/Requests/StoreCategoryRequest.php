@@ -25,7 +25,6 @@ class StoreCategoryRequest extends FormRequest
             'name'          => 'required_without:subcategories|string|max:255|unique:categories,name',
             'parent_id'     => 'nullable|numeric|exists:categories,id',
             'image'         => 'nullable|image|mimes:jpg,jpeg,png|max:3072',
-            'subcat_image'  => 'nullable|image|mimes:jpg,jpeg,png|max:3072',
 
             // Subcategories can be an array of strings
             'subcategories'     => 'nullable|array',
